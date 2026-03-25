@@ -128,63 +128,27 @@ jobs:
 
             set -euo pipefail
 
-            mkdir -p "$APP_DIR"
-            tar -xzf /tmp/customer_support_agent_release.tar.gz -C "$APP_DIR"
-            cd "$APP_DIR"
+          mkdir -p "$APP_DIR"
+          tar -xzf /tmp/customer_support_agent_release.tar.gz -C "$APP_DIR"
+          cd "$APP_DIR"
 
-            if [ ! -f .env ]; then
-              echo "ERROR: .env missing in $APP_DIR"
-              echo "Create it once on server or set EC2_ENV_FILE secret."
+          if [ ! -f .env ]; then
+            echo "ERROR: .env missing in $APP_DIR"
+            exit 1
+          fi
+
+          docker compose up -d --build --force-recreate --remove-orphans
+
+          EOF_REMOTE
+            then
+              break
+            fi
+
+            if [ "$deploy_attempt" -eq 3 ]; then
+              echo "ERROR: ssh deploy failed after ${deploy_attempt} attempts."
               exit 1
             fi
 
-            echo "Reclaiming disk space before build..."
-            docker system df || true
-            docker compose down --remove-orphans || true
-            docker builder prune -af || true
-            docker image prune -af || true
-            docker container prune -f || true
-            docker system df || true
-
-            docker compose up -d --build --force-recreate --remove-orphans
-            docker compose ps
-
-            HEALTH_URL="http://127.0.0.1:8000/health"
-            HEALTH_WAIT_SECONDS=60
-            HEALTH_INTERVAL_SECONDS=2
-            MAX_ATTEMPTS=$((HEALTH_WAIT_SECONDS / HEALTH_INTERVAL_SECONDS))
-
-            echo "Waiting for API health endpoint: $HEALTH_URL"
-
-            for health_attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-              if curl -fsS --max-time 3 "$HEALTH_URL" >/dev/null; then
-                echo "API healthy (attempt $health_attempt/$MAX_ATTEMPTS)"
-                break
-              fi
-
-              if [ "$health_attempt" -eq "$MAX_ATTEMPTS" ]; then
-                echo "ERROR: API health check failed after ${HEALTH_WAIT_SECONDS}s"
-                docker compose ps
-                docker compose logs --tail=200 api
-                exit 1
-              fi
-
-              sleep "$HEALTH_INTERVAL_SECONDS"
-            done
-
-            curl -fsS "$HEALTH_URL"
-            rm -f /tmp/customer_support_agent_release.tar.gz
-
-            EOF_REMOTE
-              then
-                break
-              fi
-
-              if [ "$deploy_attempt" -eq 3 ]; then
-                echo "ERROR: ssh deploy failed after ${deploy_attempt} attempts."
-                exit 1
-              fi
-
-              echo "ssh attempt ${deploy_attempt} failed, retrying..."
-              sleep $((deploy_attempt * 5))
-            done
+            echo "ssh attempt ${deploy_attempt} failed, retrying..."
+            sleep $((deploy_attempt * 5))
+          done
