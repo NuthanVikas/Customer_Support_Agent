@@ -174,15 +174,15 @@ jobs:
               curl -fsS "$HEALTH_URL"
               rm -f /tmp/customer_support_agent_release.tar.gz
 
-EOF_REMOTE
-              break
-            fi
+              EOF_REMOTE
+                  break
+                fi
 
-            if [ "$deploy_attempt" -eq 3 ]; then
-              echo "ERROR: ssh deploy failed after ${deploy_attempt} attempts."
-              exit 1
-            fi
+                if [ "$deploy_attempt" -eq 3 ]; then
+                  echo "ERROR: ssh deploy failed after ${deploy_attempt} attempts."
+                  exit 1
+                fi
 
-            echo "ssh attempt ${deploy_attempt} failed, retrying..."
-            sleep $((deploy_attempt * 5))
-          done
+                echo "ssh attempt ${deploy_attempt} failed, retrying..."
+                sleep $((deploy_attempt * 5))
+              done
